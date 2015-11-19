@@ -13,7 +13,7 @@ FORMATS = ['text','json','yaml']
 
 def load_sitefile( filename, debug = False ):
 	
-	default_pem = None
+	default_pkey = None
 	default_user = None
 	result = []
 
@@ -23,18 +23,18 @@ def load_sitefile( filename, debug = False ):
 
 			if re.match( r"^\s*#", line ): break
 
-			## format : host  user   pem
+			## format : host  user   pkey
 			lline = line.split()
 			if   lline[0] == 'DEFAULT_USER': default_user = lline[1]
-			elif lline[0] == 'DEFAULT_PEM': default_pem = lline[1]
+			elif lline[0] == 'DEFAULT_PKEY': default_pkey = lline[1]
 			else:
 
 				user = default_user
-				pemfile = default_pem
+				pkeyfile = default_pkey
 				if len( lline ) > 1 and lline[1] : user = lline[1]
-				if len( lline ) > 2 and lline[2] : pemfile = lline[2]
+				if len( lline ) > 2 and lline[2] : pkeyfile = lline[2]
 
-				result.append( { 'host': lline[0], 'user': user, 'pemfile': pemfile } )
+				result.append( { 'host': lline[0], 'user': user, 'pkeyfile': pkeyfile } )
 
 		fd.close()
 
@@ -43,18 +43,25 @@ def load_sitefile( filename, debug = False ):
 
 	return result
 
-def conenct( host, user, pemfile, debug = False ):
+def conenct( host, user, pkeyfile, **opt ):
 
-	if not os.path.exists( pemfile ):
-		raise RuntimeError( "ERROR: No private key file %(pem)s" % { 'pem': pemfile } )
+	port = "22"
+	debug = False 
+
+	if "debug" in opt : debug = opt['debug']
+	if "port" in opt : port = opt['port']
+
+
+	if not os.path.exists( pkeyfile ):
+		raise RuntimeError( "ERROR: No private key file %(pkey)s" % { 'pkey': pkeyfile } )
 
 	try:
-		pemref = paramiko.RSAKey.from_private_key_file( pemfile )
+		pkeyref = paramiko.RSAKey.from_private_key_file( pkeyfile )
 
 		client = paramiko.SSHClient()
 		client.set_missing_host_key_policy( paramiko.AutoAddPolicy() )
-		if debug: print( "DEBUG: Connecting to %(host)s with %(user)s using %(pem)s" % { 'host': host,'user': user, 'pem': pemfile} )
-		ret =  client.connect( hostname=host, username=user, key_filename=pemfile, timeout=10 )
+		if debug: print( "DEBUG: Connecting to %(host)s with %(user)s using %(pkey)s" % { 'host': host,'user': user, 'pkey': pkeyfile} )
+		ret =  client.connect( hostname=host, username=user, key_filename=pkeyfile, timeout=10 )
 		return client
 
 	except Exception as error:
@@ -128,6 +135,38 @@ def print_values( lhash = {} ):
 
 
 
+def print_help( ):
+	print("--help\t\t\t\tThis help")	
+	print("-d|--debug\t\t\tToggle debugging")
+	print("-u|--user <user>\t\tUsername")
+	print("-p|--pkey <pkey>\t\tPublic key file")
+	print("-h|--host <host>\t\tHostname")
+	print("-s|--site <sitefile>\t\tSitefile")
+	print("-F|--format <frm>\t\tOutputformat [text|json|yaml]")
+	print("-P|--port <port>\t\tSSH port to use, default 22")
+	print("")
+	print("Exmaple:")
+	print("#########################################")
+	print("ssh_health.py --user ec2-user --host 54.84.46.123 --pkey /home/vagrant/.ssh/aws_test.pem ")
+	print("ssh_health.py --site sitefile.txt ")
+	print("#########################################")
+	print("Site file format:")
+	print("<host> <user> <pkeyfile>")
+	print("If DEFAULT_USER and DEFAULT_PKEY is defined in file, only host is needed, one per line.")
+	print("")
+	print("Example:")
+	print("#########################################")
+	print("DEFAULT_PKEY /home/vagrant/.ssh/aws_test.pem")
+	print("DEFAULT_USER vagrant")
+	print("54.84.46.125")
+	print("54.84.46.123 ec2-user /home/vagrant/.ssh/aws_test2.pem")
+	print("54.84.46.123 ec2-user /home/vagrant/.ssh/aws_test1.pem")
+	print("54.84.46.124 ec2-user")
+	print("#########################################")
+	print("")
+
+
+
 ########################################
 if __name__ == "__main__":
 
@@ -135,14 +174,15 @@ if __name__ == "__main__":
 	script = sys.argv.pop(0)
 
 	try:
-		optlist, args = getopt.getopt( sys.argv , "ds:h:u:p:F:", ['debug','site=','user=','pem=','host=','format='])
+		optlist, args = getopt.getopt( sys.argv , "ds:h:u:p:F:", ['help','debug','site=','user=','pkey=','host=','format='])
 	except getopt.GetoptError as err:
 		print("Options: %(error)s" % { 'error': err.__str__() } )
 		sys.exit(1)
 
 	debug = False
 	user = None
-	pemfile = None
+	port = "22"
+	pkeyfile = None
 	host = None
 	sitefile = None
 	format = 'text'
@@ -150,11 +190,14 @@ if __name__ == "__main__":
 	for opt, arg in optlist:
 		if( opt   in ("-d","--debug" ) ): debug = True
 		elif( opt in ("-u","--user" ) ): user = arg
-		elif( opt in ("-p","--pem" ) ): pemfile = arg
+		elif( opt in ("-p","--pkey" ) ): pkeyfile = arg
 		elif( opt in ("-h","--host" ) ): host = arg
 		elif( opt in ("-s","--site" ) ): sitefile = arg
 		elif( opt in ("-F","--format" ) ): format = arg
-
+		elif( opt in ("-P","--port" ) ): port = arg
+		elif( opt in ("--help" ) ): 
+			print_help()
+			sys.exit(0)
 
 	if format not in FORMATS:
 		print("Unsupported output format %(f)s" % { 'f':format } )
@@ -164,14 +207,14 @@ if __name__ == "__main__":
 	if sitefile:
 		conlist = load_sitefile( sitefile, debug )
 
-	if host and pemfile and user:
-		conlist.append( { "host": host, "pemfile": pemfile, "user": user } )
+	if host and pkeyfile and user:
+		conlist.append( { "host": host, "pkeyfile": pkeyfile, "user": user } )
 
 	prep=""
 	for hdata in conlist:
 		try:
 			if debug: print("Connecting to %(h)s" % {'h': hdata['host'] } )
-			con = conenct( hdata['host'], hdata['user'], hdata['pemfile'], debug )
+			con = conenct( hdata['host'], hdata['user'], hdata['pkeyfile'], debug=debug, port=port )
 
 			data = { 
 				prep+"hostname": hdata['host'],
