@@ -61,7 +61,9 @@ def conenct( host, user, pkeyfile, **opt ):
 		client = paramiko.SSHClient()
 		client.set_missing_host_key_policy( paramiko.AutoAddPolicy() )
 		if debug: print( "DEBUG: Connecting to %(host)s with %(user)s using %(pkey)s" % { 'host': host,'user': user, 'pkey': pkeyfile} )
+
 		ret =  client.connect( hostname=host, username=user, key_filename=pkeyfile, timeout=10 )
+		
 		return client
 
 	except Exception as error:
@@ -174,7 +176,7 @@ if __name__ == "__main__":
 	script = sys.argv.pop(0)
 
 	try:
-		optlist, args = getopt.getopt( sys.argv , "ds:h:u:p:F:", ['help','debug','site=','user=','pkey=','host=','format='])
+		optlist, args = getopt.getopt( sys.argv , "ds:h:u:p:F:P:", ['help','debug','site=','port=','user=','pkey=','host=','format='])
 	except getopt.GetoptError as err:
 		print("Options: %(error)s" % { 'error': err.__str__() } )
 		sys.exit(1)
@@ -222,6 +224,7 @@ if __name__ == "__main__":
 				prep+"uptime": uptime( con, debug ),
 				prep+"meminfo": meminfo( con, debug )
 			}
+
 
 			if debug: 
 				print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
