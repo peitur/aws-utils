@@ -20,7 +20,7 @@ class MemCacheClient():
 		self.debug = False
 		self.hostname = "127.0.0.1"
 		self.port = "11211"
-		self.expiry = 3600
+		self.expiry = 4600
 		
 		self.client = None
 

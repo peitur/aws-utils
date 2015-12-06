@@ -1,0 +1,245 @@
+#!/usr/bin/env python3.4
+
+
+import os, sys
+import boto3, json
+
+from pprint import pprint
+
+MINIMAL_SETTINGS = ['ImageId','KeyName','VolumeSize', 'UserData']
+
+DEFAULT_VALUES = {
+	'DryRun':False,
+	'ImageId':None,
+	'MinCount':1,
+	'MaxCount':1,
+	'KeyName': None,
+	'SecurityGroups':[],
+	'SecurityGroupIds':[],
+	'UserData':'',
+	'InstanceType':'t2.micro',
+	'Placement':{
+		'AvailabilityZone': 'us-east-1',
+		'GroupName': None,
+		'Tenancy': 'default'
+	},
+	'KernelId':None,
+	'RamdiskId':None,
+	'BlockDeviceMappings':[
+		{
+			'VirtualName': None,
+			'DeviceName': '/dev/sda1',
+			'Ebs': {
+				'SnapshotId': None,
+				'VolumeSize': None,
+				'DeleteOnTermination': True,
+				'VolumeType': 'standard',
+				'Iops': None,
+				'Encrypted': False
+			},
+			'NoDevice': None
+		},
+	],
+	'Monitoring':{
+		'Enabled': False
+	},
+	'SubnetId':None,
+	'DisableApiTermination': False,
+	'InstanceInitiatedShutdownBehavior':'stop',
+	'PrivateIpAddress':None,
+	'ClientToken':None,
+	'AdditionalInfo':None,
+	'NetworkInterfaces':[
+		{
+			'NetworkInterfaceId': None,
+			'DeviceIndex': 0,
+			'SubnetId': None,
+			'Description': None,
+			'PrivateIpAddress': None,
+			'Groups': [],
+			'DeleteOnTermination': True,
+			'PrivateIpAddresses': [
+				{
+					'PrivateIpAddress': None,
+					'Primary': True
+				},
+			],
+			'SecondaryPrivateIpAddressCount': 0,
+			'AssociatePublicIpAddress': True
+		},
+	],
+	'IamInstanceProfile':{
+		'Arn': None,
+		'Name': None
+	},
+	'EbsOptimized' : False
+}
+
+class Deployer:
+	"""
+	"""
+
+	def __init__(self, options = {} ):
+		self.debug = False
+		self.config = {}
+
+		pprint( options )
+
+		for k in DEFAULT_VALUES:
+			if k.lower() in options: self.config[k] = options[ k.lower() ]
+			elif k in options: self.config[k] = options[ k ]
+
+		if self.debug : pprint( self.config )
+
+		for k in MINIMAL_SETTINGS:
+			if k not in self.config: raise RuntimeError( "Missing mandatory parameter %s" % k )
+
+
+	def __default_keys( self, key ):
+		if key in DEFAULT_VALUES: 
+			return DEFAULT_VALUES[key]
+		else:
+			return None
+
+
+	def print_deployer( self ):
+		pprint( self )
+
+
+############################################################
+
+def load_config( filename, **options ):
+	"""
+	
+	"""
+	debug = False
+
+	if 'filename' in options: filename = options['filename']
+	if 'debug' in options: debug = options['debug']
+
+	data = ""
+	try:
+		fd = open( filename, "r" )
+		for line in fd:	
+			data += line
+
+		fd.close()
+
+		return json.loads( data )
+	except:
+		raise
+
+
+def objectify_list( indict, rstr = None):
+	res = []
+
+	i = 0;
+
+#	print("1111111111111111111111111111111111")
+#	pprint( indict )
+#	print("1111111111111111111111111111111111")
+
+	for l in indict:
+		if rstr: prestr = rstr+"="+str(i)+","
+
+		for a in l:
+
+			if l[a] == None: 
+				l[a] = "None"
+
+			if type(l[a]) is bool:
+				res.append( prestr+a+"="+l[a].__str__() )
+
+			if type(l[a]) is str:
+				res.append( prestr+a+"="+l[a] )
+
+			if type(l[a]) is int:
+				res.append( prestr+a+"="+l[a].__str__() )
+
+			if type( l[a] ) is dict: 
+				nlist = objectify_dict( l[a], prestr+a+"=0"  )
+				res = res + nlist
+
+			if type(l[a]) is list: 
+				nlist = objectify_list( l[a], prestr+a  )
+				res = res + nlist
+
+
+		i += 1
+
+	return res
+
+def objectify_dict( indict, rstr = None ):
+
+	res = []	
+	if rstr: prestr = rstr+","
+
+
+#	print("2222222222222222222222222222")
+#	pprint( indict )
+#	print("2222222222222222222222222222")
+
+
+	for a in indict:
+		if indict[a] == None: 
+			indict[a] = "None"
+
+		if type(indict[a]) is bool:
+			res.append( prestr+a+"="+indict[a].__str__() )
+
+		if type(indict[a]) is str:
+			res.append( prestr+a+"="+indict[a] )
+
+		if type(indict[a]) is int:
+			res.append( prestr+a+"="+indict[a].__str__() )
+
+		if type( indict[a] ) is dict:
+			nlist = objectify_dict( indict[a], prestr+a+"=0" )
+			res = res + nlist
+
+		if type(indict[a]) is list:
+			nlist = objectify_list( indict[a], prestr+a )
+			res = res + nlist
+
+	return res
+
+def objectify( indict, rstr = None ):
+
+	res = []
+
+	prestr = ""
+
+	if type( indict ) is list:
+		res = res + objectify_list( indict, rstr )
+	elif type( indict ) is dict:
+		res = res + objectify_dict( indict, rstr )
+
+	return res
+
+def print_help( script ):
+	pass
+
+
+
+############################################################
+
+
+if __name__ == "__main__":
+	print("SimpleAWSDeploy")
+
+	pprint( objectify( [DEFAULT_VALUES], "root" ) )
+
+	try:
+		script = sys.argv.pop(0)
+		config = sys.argv.pop(0)
+	
+#		d = Deployer( load_config( filename=config ) )
+
+	except Exception as error:
+		print("ERROR: %(error)s " % {'error':error } )
+		print_help( script )
+		sys.exit(0)
+
+
+
+

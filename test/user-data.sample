@@ -1,0 +1,15 @@
+#!/usr/bin/sh
+export PUPPET_NODE_NAME=
+export PUPPET_SERVER_NAME=
+yum install -y wget
+wget -O /root/puppet-install.sh https://s3.amazonaws.com/pb-bucket1/Deployment/puppet/agent-installer.sh
+chmod 777 /root/puppet-install.sh
+/root/puppet-install.sh
+
+#!/usr/bin/sh
+export PUPPET_NODE_NAME=agent1.pbartha2.redbridge.se
+export PUPPET_SERVER_NAME=puppet.pbartha2.redbridge.se
+yum install -y wget
+wget -O /root/puppet-install.sh https://s3.amazonaws.com/pb-bucket1/Deployment/puppet/agent-installer.sh
+chmod 777 /root/puppet-install.sh
+/root/puppet-install.sh

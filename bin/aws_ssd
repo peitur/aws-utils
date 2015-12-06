@@ -1,0 +1,183 @@
+#!/usr/bin/python3.4
+
+import re, os, sys
+import shlex, time, datetime
+import json, yaml
+import hashlib
+import subprocess, multiprocessing
+import pathlib
+
+from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash
+
+from pprint import pprint
+
+
+
+
+
+def load_json( filename ):
+		"""
+		
+		"""
+		if not filename: raise RuntimeError( "ERROR: No configuration file")
+
+		data = ""
+		try:
+			fd = open( filename, "r" )
+			for line in fd:	
+				data += line
+			fd.close()
+
+			return json.loads( data )
+		except:
+			raise
+
+		return None
+
+
+def save_json( filename, data, **options ):
+		"""
+			
+		"""
+
+		debug = False
+		overwrite = False
+
+		if 'debug' in options: debug = options['debug']
+		if 'overwrite' in options: complete = options['overwrite']
+		if 'filename' in options: filename = options['filename']
+
+		if(debug) : print("DEBUG[WriteJson]: F:%(filename)s" % {'filename': filename})
+
+		if not filename:
+			raise RuntimeError("No write file specified")
+			
+
+		if pathlib.Path( filename ).exists() and not overwrite: return None
+
+		try:
+			fd = open( filename, "w" )
+			fd.write( json.dumps( data ) )
+			fd.close()
+		except Exception as error:
+			print("ERROR[WriteJson]: %(error)s" % { 'error':error} )
+			raise
+			
+		return True
+
+
+
+################################################
+NODE_STORE  = 'nodes'
+NODE_STATES = [ 'created', 'running','stopped','provisioning','broken']
+
+class NodeStore:
+
+	def __init__( self, path, **opt ):
+		"""
+
+		"""
+		self.debug = False
+
+		if 'debug' in opt: self.debug = opt['debug']
+		if self.debug: print("Created NodeStore at %(s)s" % { 's': path } )
+
+		self.rootpath = path
+		p = pathlib.Path( self.rootpath )
+		if not p.exists() :
+			p.mkdir( parents=True )
+			
+			print(">>> creating %(p)s " % { 'p':p } )
+			pathlib.Path( self.rootpath+"/"+NODE_STORE ).mkdir( parents=True )			
+			
+			for x in NODE_STATES:
+				a = pathlib.Path( self.rootpath+"/"+x )
+				if not a.exists() : a.mkdir( parents=True )
+
+
+	def register_node( self, node, data = {} ):
+
+		debug = self.debug
+
+		if not node: raise RuntimeError("ERROR: Missing node name")
+		if "addr" not in data: raise RuntimeError("ERROR: Missing node address")
+		if "type" not in data: raise RuntimeError("ERROR: Missing node type")
+
+		filename = self.rootpath+"/"+NODE_STORE+"/"+node
+
+		if pathlib.Path( filename ).exists() :
+
+			olddata = load_json( filename )
+
+			## Already active ndoe, just sent a new registration request
+			if 'key' in data and 'key' in olddata and data['key'] == olddata['key']:
+				return olddata['key'] ## Only trust data on server
+
+			elif 'key' not in data and 'key' in olddata:
+				return olddata['key'] ## Only trust data on server
+
+			## Node has old name and has different key, must be a different node
+			elif 'key' in data and 'key' in olddata and data['key'] != olddata['key']:
+				return None
+
+		else:
+			data['key'] = self.__gen_key__( node, data['addr'], data['type'] )
+			save_json( filename, data )
+			return data['key']
+
+
+
+	def node_state( self, node ):
+		"""
+
+		"""
+
+		debug = self.debug
+		filename = self.rootpath+"/"+NODE_STORE+"/"+node
+
+		states = []
+
+		for f in NODE_STATES:
+			if pathlib.Path( self.rootpath+"/"+f+"/"+node ).exists(): states.append( f )
+
+		return states
+
+
+	def __gen_key__( self, node, addr, ntype ):
+		now = str( datetime.datetime.utcnow().timestamp() )
+		xstr = node+addr+ntype+now
+
+		return hashlib.sha224( bytes( xstr , "ascii") ).hexdigest()
+
+
+
+################################################
+
+
+def load_config( filename ):
+	return load_json( filename )
+
+
+
+if __name__ == '__main__':
+
+	script = sys.argv.pop(0)
+
+	conf = load_config( sys.argv.pop(0) )
+
+	pprint( conf )
+
+	if conf:
+		nodes = [ 
+			{ "test1": {'addr': "127.0.0.1", 'type': "web", "key":"98977fb8ddc75b0ee3a69ef7805c65a403e39dd7cab2b74754c93ded" } }, 
+			{ "test2": {'addr': "127.0.0.1", 'type': "web" } },
+			{ "test1": {'addr': "127.0.0.1", 'type': "web", "key":"98977fb8ddc75b0ee3a69ef7805c65a403e39dd7cab2b74754c93dex" } } 
+
+
+		]
+
+		for c in conf:
+			ns = NodeStore( c['store'] )
+			for n in nodes:
+				for a in n.keys():
+					pprint(  { a: ns.register_node( a, n[a] ) } )

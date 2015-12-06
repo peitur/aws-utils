@@ -1,0 +1,1 @@
+../../../puppet-util/bin/agent-installer.sh
