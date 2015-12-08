@@ -4,6 +4,7 @@ import hashlib, pathlib
 import subprocess, multiprocessing
 
 import AwsUtils.utils
+from pprint import pprint
 
 ################################################
 NODE_STORE  = 'nodes'
@@ -43,10 +44,13 @@ class NodeStore:
 		if "type" not in data: raise RuntimeError("ERROR: Missing node type")
 
 		filename = self.rootpath+"/"+NODE_STORE+"/"+node
-
 		if pathlib.Path( filename ).exists() :
 
 			olddata = AwsUtils.utils.load_json( filename )
+
+#			pprint( data )
+#			pprint( olddata )
+
 
 			## Already active ndoe, just sent a new registration request
 			if 'key' in data and 'key' in olddata and data['key'] == olddata['key']:
@@ -59,6 +63,9 @@ class NodeStore:
 			elif 'key' in data and 'key' in olddata and data['key'] != olddata['key']:
 				return None
 
+			elif 'key' in data and 'key' in olddata and data['key'] == olddata['key']:
+				return olddata['key']
+
 		else:
 			data['key'] = self.__gen_key__( node, data['addr'], data['type'] )
 			AwsUtils.utils.save_json( filename, data )
@@ -68,7 +75,7 @@ class NodeStore:
 
 	def node_state( self, node, state = None ):
 		"""
-
+			get and set node state
 		"""
 
 		if state :
@@ -89,18 +96,27 @@ class NodeStore:
 		if 'key' not in data: raise RuntimeError( "Missing key in node indata")
 		if 'key' not in nodedata: raise RuntimeError( "Missing key in node store")
 
+
+		if debug : print("V: %(v)s : D: %(d)s " % { 'v': self.__verification_key__( nodedata['key'], node ), 'd': data['key'] } )
+
 		if self.__verification_key__( nodedata['key'], node ) != data['key']:
 			raise RuntimeError( "Missmatching keys from node")
 
 
-		for f in NODE_STATES:
-			fname = self.rootpath+"/"+f+"/"+node
-			if pathlib.Path( fname ).exists(): os.unlink( fname )
+		if self.__node_cleanup_states__( node ):
+			if self.__node_cleanup__( node ):
+				return True
 
-		if pathlib.Path( filename ).exists(): os.unlink( filename )
+		return False
 
 
-		return True
+
+	def node_is_defined( self, node ):
+		filename = self.rootpath+"/"+NODE_STORE+"/"+node
+		if pathlib.Path( filename ).exists() :
+			return AwsUtils.utils.load_json( filename )
+		return None
+
 
 
 	def update_node( self, node, data = {} ):
@@ -116,11 +132,10 @@ class NodeStore:
 		"""
 		"""
 
-
-
 		debug = self.debug
 		filename = self.rootpath+"/"+NODE_STORE+"/"+node
 
+		if not node: raise RuntimeError("Node missing")
 		if not state: raise RuntimeError("State is False/None")
 		if state and len( state ) == 0: raise RuntimeError("Empty state string")		
 		if state not in NODE_STATES: raise RuntimeError("Bad state given")
@@ -138,10 +153,24 @@ class NodeStore:
 			if s != state and pathlib.Path( sfname ).exists() and pathlib.Path( sfname ).is_symlink():	
 				pathlib.Path( sfname ).unlink()
 
+		return False
+
+
+	def __node_cleanup_states__( self, node ):
+		## Cleanout all states
+		for s in NODE_STATES:
+			sfname = self.rootpath+"/"+s+"/"+node
+			if pathlib.Path( sfname ).exists() and pathlib.Path( sfname ).is_symlink():	
+				pathlib.Path( sfname ).unlink()
 
 		return True
 
+	def __node_cleanup__( self, node ):
+		sfname = self.rootpath+"/"+NODE_STORE+"/"+node
+		if pathlib.Path( sfname ).exists():	
+			pathlib.Path( sfname ).unlink()
 
+		return True
 
 	def __get_node_state__( self, node ):
 		"""
@@ -167,9 +196,10 @@ class NodeStore:
 
 		return hashlib.sha224( bytes( xstr , "ascii") ).hexdigest()
 
-	def __verification_key__( self, key , node ):		
+	def __verification_key__( self, key , node ):
+
 		xtime = int( datetime.datetime.utcnow().timestamp() )
-		xterm = xtime / self.verification_time
+		xterm = int( xtime / self.verification_time )
 
 		xstr = key+node+str( xterm )
 
@@ -177,6 +207,13 @@ class NodeStore:
 
 	def div_val( self ):
 		return self.verification_time
+
+
+
+
+
+if __name__ == "__main__":
+	pass
 
 
 
