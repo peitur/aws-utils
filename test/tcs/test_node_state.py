@@ -108,6 +108,32 @@ class TestNodeState( unittest.TestCase ):
 		self.assertIsNotNone( self.nstore.node_is_defined( 'test2.node.json' ) )
 
 
+	def test_keyverification( self ):
+
+		node = 'test1.node.json'
+		ok_key  = "98977fb8ddc75b0ee3a69ef7805c65a403e39dd7cab2b74754c93ded"
+		not_key = "98977fb8ddc75b0ee3a69ef7805c65a403e39dd7cab2b74754c93dex"
+
+		## Matching
+		self.__initialize_files__()
+		self.nodes = NODE_DATA
+
+		self.assertEqual( self.nstore.register_node( node , self.nodes[ node ] ), ok_key )		
+		self.assertTrue( self.nstore.verify_key( self.__xverification_key__( ok_key, node ), node ) )
+	
+		## NOT Matching
+		self.__initialize_files__()
+		self.nodes = NODE_DATA
+
+		self.assertEqual( self.nstore.register_node( node , self.nodes[ node ] ), ok_key )		
+		self.assertFalse( self.nstore.verify_key( self.__xverification_key__( not_key, node ), node ) )
+
+
+		self.assertIsNone( self.nstore.node_is_defined( 'test30.node.json' ) )
+		self.assertIsNotNone( self.nstore.node_is_defined( 'test1.node.json' ) )
+		self.assertIsNotNone( self.nstore.node_is_defined( 'test2.node.json' ) )
+
+
 
 
 

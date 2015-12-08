@@ -128,6 +128,18 @@ class NodeStore:
 		return NODE_STATES
 
 
+	def verify_key( self, key, node ):
+
+		filename = self.rootpath+"/"+NODE_STORE+"/"+node
+		if pathlib.Path( filename ).exists() :
+			olddata = AwsUtils.utils.load_json( filename )
+
+			if self.__verification_key__( olddata['key'], node ) == key :
+				return True
+
+		return False
+
+
 	def __set_node_state__( self, node, state ):
 		"""
 		"""
