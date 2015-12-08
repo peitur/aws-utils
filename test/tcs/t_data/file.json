@@ -1,0 +1,7 @@
+{
+	"aaa": "AAA",
+	"bbb": {
+		"ccc":"CCC",
+		"ddd":["eee"]
+	}
+}
