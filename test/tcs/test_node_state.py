@@ -60,8 +60,27 @@ class TestNodeState( unittest.TestCase ):
 	def xtest_update( self ):
 		pass
 
-	def xtest_node_state( self ):
-		pass
+	def test_node_state( self ):
+
+		self.assertIsNotNone( self.nstore.register_node( "test10.node.json", self.nodes['test0.node.json'] ) )
+		self.assertEqual( self.nstore.node_state( "test10.node.json" ), [] )
+
+		self.assertIsNotNone( self.nstore.register_node( "test11.node.json", self.nodes['test0.node.json'] ) )
+		self.assertEqual( self.nstore.node_state( "test11.node.json", "created" ), ["created"] )
+		self.assertEqual( self.nstore.node_state( "test11.node.json", "started" ), ["started"] )
+		pprint( self.nstore.node_state( "test11.node.json" ) )
+
+		self.assertIsNotNone( self.nstore.register_node( "test12.node.json", self.nodes['test1.node.json'] ) )
+		with self.assertRaises(Exception):
+			self.nstore.node_state( "test12.node.json", "badstate" )
+
+		## Equals empty list as a dep. on previous tests that should not have taken effect
+		self.assertEqual( self.nstore.node_state( "test12.node.json", None ), [] )
+
+		self.assertFalse( self.nstore.node_state( "test12.node.json", "" ) )
+
+
+
 
 	def xtest_key_gen( self ):
 		pass
